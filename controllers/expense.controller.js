@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma"); 
 
+//create expense
 const createExpense = async (req, res) => {
   const { description, amount, category, date, budgetId } = req.body;
   const userId = req.user.id;
@@ -30,7 +31,7 @@ const createExpense = async (req, res) => {
   }
 };
 
-// expense.controller.js
+// get expenses for a user
 const getExpenses = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -44,6 +45,8 @@ const getExpenses = async (req, res) => {
   }
 };
 
+
+//update expense
 const updateExpense = async (req, res) => {
   const { id } = req.params;
   const { description, amount, category, date, budgetId } = req.body;
@@ -66,6 +69,8 @@ const updateExpense = async (req, res) => {
   }
 };
 
+
+//delete expense
 const deleteExpense = async (req, res) => {
   const { id } = req.params;
 
@@ -79,7 +84,7 @@ const deleteExpense = async (req, res) => {
   }
 };
 
-
+//get expenses by budget
 const getExpensesByBudget = async (req, res) => {
   const userId = req.user.id;
   const budgetId = parseInt(req.params.budgetId);

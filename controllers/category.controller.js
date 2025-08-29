@@ -1,5 +1,6 @@
 const prisma = require("../config/prisma");
 
+// Create a category 
 const createCategory = async (req, res) => {
   const userId = req.user.id;
   const { name, type, color } = req.body;
@@ -20,7 +21,7 @@ const createCategory = async (req, res) => {
     res.status(500).json({ message: "Failed to create category." });
   }
 };
-
+// Get all cayegories for a user
 const getCategories = async (req, res) => {
   const userId = req.user.id;
 
@@ -36,7 +37,7 @@ const getCategories = async (req, res) => {
   }
 };
 
-
+//delete category
 const deleteCategory = async (req, res) => {
   const id = Number(req.params.id);
 
@@ -47,7 +48,7 @@ const deleteCategory = async (req, res) => {
       return res.status(404).json({ error: "Category not found" });
     }
 
-    // ✅ Make sure this is defined BEFORE using it
+   
     const linkedTransactions = await prisma.transaction.findMany({
       where: { categoryId: id },
     });

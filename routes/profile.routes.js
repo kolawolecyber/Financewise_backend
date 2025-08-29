@@ -6,7 +6,7 @@ const {verifyToken} = require("../middleware/expenseAuthMiddleware");
 // Get user settings
 router.get("/settings", verifyToken, getUserSettings);
 
-// Update user settings
+// Updae user settings
 router.put("/settings", verifyToken, updateUserSettings);
 
 module.exports = router;
