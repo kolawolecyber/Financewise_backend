@@ -1,5 +1,13 @@
 const prisma = require("../config/prisma");
+const streamifier = require("streamifier");
+const cloudinary = require("cloudinary").v2;
+require('dotenv').config();
 
+cloudinary.config({
+    cloud_name:process.env.CLOUDINARY_CLOUD_NAME,
+    api_key:process.env.CLOUDINARY_API_KEY,
+    api_secret:process.env.CLOUDINARY_API_SECRET,
+});
 // GET User Settings
 const getUserSettings = async (req, res) => {
   try {
@@ -32,15 +40,43 @@ const getUserSettings = async (req, res) => {
 const updateUserSettings = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { monthlyIncome, currency, financialGoal, profilePic } = req.body;
+    const { monthlyIncome, currency, financialGoal } = req.body;
+
+    let profilePicUrl = null;
+
+    if (req.file) {
+      console.log("req.file:", req.file);
+      profilePicUrl = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { folder: "financewise/profile_pics", 
+            quality: "50",  fetch_format: "jpg", flags: "lossy",  
+    fetch_format: "jpg",   
+    transformation: [
+      { width: 300, height: 300, crop: "limit" }, 
+    ], },
+          (error, result) => {
+            if (error) {
+              console.error("Cloudinary upload error:", error);
+              reject(error);
+            } else {
+              console.log("Cloudinary upload success:", result.secure_url);
+              resolve(result.secure_url);
+            }
+          }
+        );
+
+        // Ensure the buffer is piped and stream ends properly
+        streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+      });
+    }
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        monthlyIncome:monthlyIncome ? parseFloat(monthlyIncome) : null,
+        monthlyIncome: monthlyIncome ? parseFloat(monthlyIncome) : null,
         currency,
         financialGoal,
-        profilePic,
+        ...(profilePicUrl && { profilePic: profilePicUrl }), // only set if uploaded
       },
       select: {
         id: true,
@@ -53,11 +89,14 @@ const updateUserSettings = async (req, res) => {
       },
     });
 
-    res.json(updatedUser);
+    return res.json(updatedUser);
   } catch (error) {
     console.error("Error updating settings:", error);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error", error });
   }
 };
+
+
+
 
 module.exports = { getUserSettings, updateUserSettings };

@@ -2,6 +2,7 @@ const prisma = require("../config/prisma");
 
 const { parse, isValid } = require("date-fns");
 
+//create transaction
 const createTransaction = async (req, res) => {
   const userId = req.user.id;
   const { title, amount, type, date, categoryId } = req.body;
@@ -39,6 +40,8 @@ const createTransaction = async (req, res) => {
     res.status(500).json({ message: "Failed to create transaction.", error: error.message });
   }
 };
+
+//delete transaction
 const deleteTransaction = async (req, res) => {
   const { id } = req.params;
 
@@ -52,6 +55,8 @@ const deleteTransaction = async (req, res) => {
   }
 };
 
+
+// Get all transactions for a user
 const getTransactions = async (req, res) => {
   const userId = req.user.id;
 
