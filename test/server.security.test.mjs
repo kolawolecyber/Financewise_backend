@@ -10,6 +10,13 @@ const require = createRequire(import.meta.url);
 const app = require("../server");
 
 describe("request origin security", () => {
+  it("provides a public health check for deployment monitoring", async () => {
+    const response = await request(app).get("/health");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: "ok" });
+  });
+
   it("rejects state-changing requests from untrusted origins", async () => {
     const response = await request(app)
       .post("/api/auth/logout")

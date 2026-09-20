@@ -21,6 +21,9 @@
     "url": "https://github.com/kolawolecyber/Financewise_backend/issues"
   },
   "homepage": "https://github.com/kolawolecyber/Financewise_backend#readme",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "bcrypt": "^6.0.0",
