@@ -10,7 +10,8 @@ store an access token in `localStorage`. `POST /api/auth/logout` clears the cook
 
 Bearer authorization remains accepted temporarily for existing clients migrating
 to the cookie flow. Every protected controller scopes resource reads and writes to
-the authenticated user's ID.
+the authenticated user's ID. State-changing requests are accepted only from an
+origin listed in `FRONTEND_URL`; production also requires a strong `JWT_SECRET`.
 
 ## Load testing
 

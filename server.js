@@ -18,14 +18,15 @@ const allowedOrigins = (process.env.FRONTEND_URL || "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-if (!process.env.JWT_SECRET) {
-  throw new Error("JWT_SECRET must be configured before starting the server.");
+if (process.env.NODE_ENV === "production" && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET === "your_super_secret_key")) {
+  throw new Error("A strong JWT_SECRET must be configured before starting the production server.");
 }
+const isAllowedOrigin = (origin) => !origin || allowedOrigins.includes(origin);
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
     // allow REST tools or server-to-server requests with no origin
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
@@ -34,6 +35,14 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: "100kb" }));
+app.use((req, res, next) => {
+  const origin = req.get("Origin");
+  const stateChangingMethod = ["POST", "PUT", "PATCH", "DELETE"].includes(req.method);
+  if (stateChangingMethod && !isAllowedOrigin(origin)) {
+    return res.status(403).json({ message: "Origin is not allowed." });
+  }
+  return next();
+});
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
