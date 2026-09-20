@@ -1,113 +1,80 @@
-const prisma = require("../config/prisma"); 
+const prisma = require("../config/prisma");
+const { parseMonthDayYear, parsePositiveAmount, parsePositiveInt } = require("../utils/validation");
 
-//create expense
-const createExpense = async (req, res) => {
-  const { description, amount, category, date, budgetId } = req.body;
-  const userId = req.user.id;
-  if (!description || !amount || !category || !date || !budgetId) {
-    return res.status(400).json({ message: "All fields are required." });
+const validateExpense = ({ description, amount, category, date, budgetId }) => {
+  const parsedAmount = parsePositiveAmount(amount);
+  const parsedBudgetId = parsePositiveInt(budgetId);
+  const parsedDate = parseMonthDayYear(date);
+  if (typeof description !== "string" || !description.trim() || !parsedAmount || typeof category !== "string" || !category.trim() || !parsedBudgetId || parsedDate.error) {
+    return { error: "description, a positive amount, category, a valid date, and budgetId are required." };
   }
-
-  const parsedDate = new Date(date);
-  if (isNaN(parsedDate.getTime())) {
-    return res.status(400).json({ message: "Invalid date format." });
-  }
-  try {
-    const expense = await prisma.expense.create({
-      data: {
-        description,
-        amount:parseFloat(amount),
-        category,
-        date: parsedDate,
-        userId,
-        budgetId,
-      },
-    });
-
-    res.status(201).json(expense);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Error creating expense" });
-  }
+  return { value: { description: description.trim(), amount: parsedAmount, category: category.trim(), date: parsedDate.value, budgetId: parsedBudgetId } };
 };
 
-// get expenses for a user
-const getExpenses = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const expenses = await prisma.expense.findMany({
-      where: { userId },
-      orderBy: { date: "desc" },
-    });
-    res.json(expenses);
-  } catch (error) {
-    res.status(500).json({ error: "Could not fetch expenses" });
-  }
-};
-
-
-//update expense
-const updateExpense = async (req, res) => {
-  const { id } = req.params;
-  const { description, amount, category, date, budgetId } = req.body;
+const createExpense = async (req, res, next) => {
+  const validated = validateExpense(req.body);
+  if (validated.error) return res.status(400).json({ message: validated.error });
 
   try {
-    const updated = await prisma.expense.update({
-      where: { id: Number(id) },
-      data: {
-        description,
-        amount:parseFloat(amount),
-        category,
-        date: new Date(date),
-        budgetId,
-      },
-    });
-
-    res.json(updated);
+    const budget = await prisma.budget.findFirst({ where: { id: validated.value.budgetId, userId: req.user.id } });
+    if (!budget) return res.status(404).json({ message: "Budget not found." });
+    const expense = await prisma.expense.create({ data: { ...validated.value, userId: req.user.id } });
+    return res.status(201).json(expense);
   } catch (error) {
-    res.status(500).json({ error: "Could not update expense" });
+    return next(error);
   }
 };
 
+const getExpenses = async (req, res, next) => {
+  try {
+    const expenses = await prisma.expense.findMany({ where: { userId: req.user.id }, orderBy: { date: "desc" } });
+    return res.json(expenses);
+  } catch (error) {
+    return next(error);
+  }
+};
 
-//delete expense
-const deleteExpense = async (req, res) => {
-  const { id } = req.params;
+const updateExpense = async (req, res, next) => {
+  const id = parsePositiveInt(req.params.id);
+  const validated = validateExpense(req.body);
+  if (!id) return res.status(400).json({ message: "Invalid expense id." });
+  if (validated.error) return res.status(400).json({ message: validated.error });
 
   try {
-    await prisma.expense.delete({
-      where: { id: Number(id) },
-    });
-    res.json({ message: "Expense deleted successfully" });
+    const budget = await prisma.budget.findFirst({ where: { id: validated.value.budgetId, userId: req.user.id } });
+    if (!budget) return res.status(404).json({ message: "Budget not found." });
+    const result = await prisma.expense.updateMany({ where: { id, userId: req.user.id }, data: validated.value });
+    if (!result.count) return res.status(404).json({ message: "Expense not found." });
+    const expense = await prisma.expense.findUnique({ where: { id } });
+    return res.json(expense);
   } catch (error) {
-    res.status(500).json({ error: "Could not delete expense" });
+    return next(error);
   }
 };
 
-//get expenses by budget
-const getExpensesByBudget = async (req, res) => {
-  const userId = req.user.id;
-  const budgetId = parseInt(req.params.budgetId);
-console.log("userId from token:", userId);
-console.log("budgetId from request:", budgetId);
+const deleteExpense = async (req, res, next) => {
+  const id = parsePositiveInt(req.params.id);
+  if (!id) return res.status(400).json({ message: "Invalid expense id." });
   try {
-    const expenses = await prisma.expense.findMany({
-      where: {
-        userId,
-        budgetId,
-      },
-    });
-
-    res.json(expenses);
+    const result = await prisma.expense.deleteMany({ where: { id, userId: req.user.id } });
+    if (!result.count) return res.status(404).json({ message: "Expense not found." });
+    return res.json({ message: "Expense deleted successfully." });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching expenses for budget" });
+    return next(error);
   }
 };
 
-module.exports = {
-  createExpense,
-  getExpenses,
-  getExpensesByBudget,
-  updateExpense,
-  deleteExpense
+const getExpensesByBudget = async (req, res, next) => {
+  const budgetId = parsePositiveInt(req.params.budgetId);
+  if (!budgetId) return res.status(400).json({ message: "Invalid budget id." });
+  try {
+    const budget = await prisma.budget.findFirst({ where: { id: budgetId, userId: req.user.id } });
+    if (!budget) return res.status(404).json({ message: "Budget not found." });
+    const expenses = await prisma.expense.findMany({ where: { userId: req.user.id, budgetId } });
+    return res.json(expenses);
+  } catch (error) {
+    return next(error);
+  }
 };
+
+module.exports = { createExpense, getExpenses, getExpensesByBudget, updateExpense, deleteExpense };

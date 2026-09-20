@@ -8,6 +8,6 @@ const  upload = require( "../middleware/upload");
 router.get("/settings", verifyToken, getUserSettings);
 
 // Updae user settings
-router.put("/settings", verifyToken,upload.single('profilePic'), updateUserSettings);
+router.put("/settings", verifyToken, upload.single('profilePic'), updateUserSettings);
 
 module.exports = router;

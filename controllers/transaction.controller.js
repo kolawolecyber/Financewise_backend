@@ -1,80 +1,56 @@
 const prisma = require("../config/prisma");
+const { parseMonthDayYear, parsePositiveAmount, parsePositiveInt } = require("../utils/validation");
 
-const { parse, isValid } = require("date-fns");
-
-//create transaction
-const createTransaction = async (req, res) => {
-  const userId = req.user.id;
+const createTransaction = async (req, res, next) => {
   const { title, amount, type, date, categoryId } = req.body;
-
-  let parsedDate;
-
-  // Use current date if date not provided
-  if (!date) {
-    parsedDate = new Date();
-  } else if (typeof date === "string") {
-    parsedDate = parse(date, "MM/dd/yyyy", new Date());
-
-    if (!isValid(parsedDate)) {
-      return res.status(400).json({ error: "Invalid date format. Use MM/dd/yyyy" });
-    }
-  } else {
-    return res.status(400).json({ error: "Date must be a string" });
-  }
-
-  try {
-    const transaction = await prisma.transaction.create({
-      data: {
-        title,
-        amount: parseFloat(amount),
-        type,
-        date: parsedDate,
-        userId,
-        categoryId: categoryId ? parseInt(categoryId) : null,
-      },
-    });
-
-    res.status(201).json(transaction);
-  } catch (error) {
-    console.error("🔥 Transaction creation failed:", error); // log full error
-    res.status(500).json({ message: "Failed to create transaction.", error: error.message });
-  }
-};
-
-//delete transaction
-const deleteTransaction = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    await prisma.transaction.delete({
-      where: { id: Number(id) },
-    });
-    res.json({ message: "Expense deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ error: "Could not delete expense" });
-  }
-};
-
-
-// Get all transactions for a user
-const getTransactions = async (req, res) => {
   const userId = req.user.id;
+  const parsedAmount = parsePositiveAmount(amount);
+  const parsedCategoryId = parsePositiveInt(categoryId);
 
+  if (typeof title !== "string" || !title.trim() || !parsedAmount || !["income", "expense"].includes(type) || !parsedCategoryId) {
+    return res.status(400).json({ message: "title, a positive amount, type (income or expense), and categoryId are required." });
+  }
+
+  const parsedDate = date ? parseMonthDayYear(date) : { value: new Date() };
+  if (parsedDate.error) return res.status(400).json({ message: parsedDate.error });
+
+  try {
+    const category = await prisma.category.findFirst({ where: { id: parsedCategoryId, userId } });
+    if (!category) return res.status(404).json({ message: "Category not found." });
+    if (category.type !== type) return res.status(400).json({ message: "Transaction type must match the category type." });
+
+    const transaction = await prisma.transaction.create({
+      data: { title: title.trim(), amount: parsedAmount, type, date: parsedDate.value, userId, categoryId: parsedCategoryId },
+      include: { category: true },
+    });
+    return res.status(201).json(transaction);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const deleteTransaction = async (req, res, next) => {
+  const id = parsePositiveInt(req.params.id);
+  if (!id) return res.status(400).json({ message: "Invalid transaction id." });
+
+  try {
+    const result = await prisma.transaction.deleteMany({ where: { id, userId: req.user.id } });
+    if (!result.count) return res.status(404).json({ message: "Transaction not found." });
+    return res.json({ message: "Transaction deleted successfully." });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getTransactions = async (req, res, next) => {
   try {
     const transactions = await prisma.transaction.findMany({
-      where: { userId },
-      include: { category: true },
-      orderBy: { date: "desc" },
+      where: { userId: req.user.id }, include: { category: true }, orderBy: { date: "desc" },
     });
-
-    res.json(transactions);
+    return res.json(transactions);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch transactions." });
+    return next(error);
   }
 };
 
-module.exports = {
-  createTransaction,
-  getTransactions,
-  deleteTransaction
-};
+module.exports = { createTransaction, getTransactions, deleteTransaction };

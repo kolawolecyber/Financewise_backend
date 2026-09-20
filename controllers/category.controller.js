@@ -1,14 +1,23 @@
 const prisma = require("../config/prisma");
+const { parsePositiveInt } = require("../utils/validation");
 
 // Create a category 
 const createCategory = async (req, res) => {
   const userId = req.user.id;
   const { name, type, color } = req.body;
 
+  if (typeof name !== "string" || !name.trim() || !["income", "expense"].includes(type)) {
+    return res.status(400).json({ message: "name and type (income or expense) are required." });
+  }
+
+  if (color !== undefined && (typeof color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(color))) {
+    return res.status(400).json({ message: "color must be a six-digit hex color." });
+  }
+
   try {
     const category = await prisma.category.create({
       data: {
-        name,
+        name: name.trim(),
         type,
         color,
         userId,
@@ -39,10 +48,11 @@ const getCategories = async (req, res) => {
 
 //delete category
 const deleteCategory = async (req, res) => {
-  const id = Number(req.params.id);
+  const id = parsePositiveInt(req.params.id);
+  if (!id) return res.status(400).json({ error: "Invalid category id." });
 
   try {
-    const category = await prisma.category.findUnique({ where: { id } });
+    const category = await prisma.category.findFirst({ where: { id, userId: req.user.id } });
 
     if (!category) {
       return res.status(404).json({ error: "Category not found" });
@@ -50,7 +60,7 @@ const deleteCategory = async (req, res) => {
 
    
     const linkedTransactions = await prisma.transaction.findMany({
-      where: { categoryId: id },
+      where: { categoryId: id, userId: req.user.id },
     });
 
     if (linkedTransactions.length > 0) {
@@ -59,7 +69,7 @@ const deleteCategory = async (req, res) => {
       });
     }
 
-    await prisma.category.delete({ where: { id } });
+    await prisma.category.deleteMany({ where: { id, userId: req.user.id } });
 
     return res.status(200).json({ message: "Category deleted successfully" });
   } catch (err) {

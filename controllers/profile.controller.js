@@ -1,6 +1,7 @@
 const prisma = require("../config/prisma");
 const streamifier = require("streamifier");
 const cloudinary = require("cloudinary").v2;
+const { parsePositiveAmount } = require("../utils/validation");
 require('dotenv').config();
 
 cloudinary.config({
@@ -42,6 +43,16 @@ const updateUserSettings = async (req, res) => {
     const userId = req.user.id;
     const { monthlyIncome, currency, financialGoal } = req.body;
 
+    if (monthlyIncome !== undefined && monthlyIncome !== "" && !parsePositiveAmount(monthlyIncome)) {
+      return res.status(400).json({ message: "monthlyIncome must be a positive number." });
+    }
+    if (currency !== undefined && (typeof currency !== "string" || !/^[A-Z]{3}$/.test(currency))) {
+      return res.status(400).json({ message: "currency must be a three-letter uppercase code." });
+    }
+    if (financialGoal !== undefined && (typeof financialGoal !== "string" || financialGoal.length > 500)) {
+      return res.status(400).json({ message: "financialGoal must be text up to 500 characters." });
+    }
+
     let profilePicUrl = null;
 
     if (req.file) {
@@ -73,7 +84,7 @@ const updateUserSettings = async (req, res) => {
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        monthlyIncome: monthlyIncome ? parseFloat(monthlyIncome) : null,
+        monthlyIncome: monthlyIncome === "" ? null : monthlyIncome === undefined ? undefined : parsePositiveAmount(monthlyIncome),
         currency,
         financialGoal,
         ...(profilePicUrl && { profilePic: profilePicUrl }), // only set if uploaded

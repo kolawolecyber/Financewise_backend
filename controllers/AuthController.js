@@ -1,10 +1,14 @@
 const prisma = require("../config/prisma"); 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+const JWT_SECRET = process.env.JWT_SECRET;
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const signup = async (req, res) => {
   const { name, email, password } = req.body;
+
+  if (typeof name !== "string" || !name.trim() || typeof email !== "string" || !/^\S+@\S+\.\S+$/.test(email) || typeof password !== "string" || password.length < 8) {
+    return res.status(400).json({ message: "name, a valid email, and a password of at least 8 characters are required." });
+  }
 
   try {
     // Check if user exists
@@ -17,8 +21,8 @@ const signup = async (req, res) => {
     // Create user
     const newUser = await prisma.user.create({
       data: {
-        name,
-        email,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
         password: hashedPassword
       }
     });
@@ -33,9 +37,13 @@ const signup = async (req, res) => {
 const login = async (req, res) => {
   const { email, password } = req.body;
 
+  if (typeof email !== "string" || typeof password !== "string") {
+    return res.status(400).json({ message: "Email and password are required." });
+  }
+
   try {
     // Find user
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
     if (!user) return res.status(400).json({ message: 'Invalid email or password' });
 
     // Compare password

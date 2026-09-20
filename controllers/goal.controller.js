@@ -1,27 +1,26 @@
 const prisma = require("../config/prisma");
+const { parseMonthDayYear, parsePositiveAmount, parsePositiveInt } = require("../utils/validation");
 
-const { parse, isValid } = require("date-fns");
 
+//create a goal
 const createGoal = async (req, res) => {
   const userId = req.user.id;
   const { title, targetAmount, targetDate } = req.body;
+  const parsedAmount = parsePositiveAmount(targetAmount);
 
-  if (!targetDate || typeof targetDate !== "string") {
-    return res.status(400).json({ error: "Target date is required and must be a string." });
+  if (typeof title !== "string" || !title.trim() || !parsedAmount) {
+    return res.status(400).json({ error: "title and a positive target amount are required." });
   }
 
-  const parsedDate = parse(targetDate, "MM/dd/yyyy", new Date());
-
-  if (!isValid(parsedDate)) {
-    return res.status(400).json({ error: "Invalid target date provided." });
-  }
+  const parsedDate = parseMonthDayYear(targetDate, "targetDate");
+  if (parsedDate.error) return res.status(400).json({ error: parsedDate.error });
 
   try {
     const goal = await prisma.goal.create({
       data: {
-        title,
-        targetAmount: parseFloat(targetAmount),
-        targetDate: parsedDate,
+        title: title.trim(),
+        targetAmount: parsedAmount,
+        targetDate: parsedDate.value,
         userId,
       },
     });
@@ -32,6 +31,8 @@ const createGoal = async (req, res) => {
     res.status(500).json({ message: "Failed to create goal." });
   }
 };
+
+// Get all goals for a user
 const getUserGoals = async (req, res) => {
   const userId = req.user.id;
 
@@ -47,74 +48,73 @@ const getUserGoals = async (req, res) => {
   }
 };
 
- const updateGoal = async (req, res) => {
-  const goalId = parseInt(req.params.id);
-  const { amount } = req.body;
+//update goal
+const updateGoal = async (req, res) => {
+  const goalId = parsePositiveInt(req.params.id);
+  const amount = parsePositiveAmount(req.body.amount);
+  if (!goalId) return res.status(400).json({ error: "Invalid goal id." });
+  if (!amount) return res.status(400).json({ error: "A positive amount is required." });
 
   try{
-
-  const goal = await prisma.goal.update({
-    where: { id: goalId },
-    data: {
-      savedAmount: {
-        increment: amount,
-      },
-    },
+  const result = await prisma.goal.updateMany({
+    where: { id: goalId, userId: req.user.id },
+    data: { savedAmount: { increment: amount } },
   });
+  if (!result.count) return res.status(404).json({ error: "Goal not found." });
+
+  const goal = await prisma.goal.findFirst({ where: { id: goalId, userId: req.user.id } });
 
   res.json(goal);
 } catch (error) {
-    res.status(500).json({ message: "Failed to fetch goals." });
+    res.status(500).json({ message: "Failed to update goal." });
   }
 };
 
-
+//edit goal
 const editGoal = async (req, res) => {
-  const goalId = parseInt(req.params.id);
+  const goalId = parsePositiveInt(req.params.id);
   const { title, targetAmount, targetDate} = req.body;
+  const parsedAmount = parsePositiveAmount(targetAmount);
 
-
- if (!targetDate || typeof targetDate !== "string") {
-    return res.status(400).json({ error: "Target date is required and must be a string." });
+  if (!goalId) return res.status(400).json({ error: "Invalid goal id." });
+  if (typeof title !== "string" || !title.trim() || !parsedAmount) {
+    return res.status(400).json({ error: "title and a positive target amount are required." });
   }
 
-  const parsedDate = parse(targetDate, "MM/dd/yyyy", new Date());
-
-  if (!isValid(parsedDate)) {
-    return res.status(400).json({ error: "Invalid target date provided." });
-  }
+  const parsedDate = parseMonthDayYear(targetDate, "targetDate");
+  if (parsedDate.error) return res.status(400).json({ error: parsedDate.error });
 
   try{
-
-  const goal = await prisma.goal.update({
-    where: { id: goalId },
+  const result = await prisma.goal.updateMany({
+    where: { id: goalId, userId: req.user.id },
     data: {
-      title,
-      targetAmount:parseFloat(targetAmount),
-      targetDate:parsedDate,
-      
-         },
+      title: title.trim(),
+      targetAmount: parsedAmount,
+      targetDate: parsedDate.value,
+    },
   });
+  if (!result.count) return res.status(404).json({ error: "Goal not found." });
+
+  const goal = await prisma.goal.findFirst({ where: { id: goalId, userId: req.user.id } });
 
   res.json(goal);
 } catch (error) {
-   console.error("Edit goal failed:", error);
-     console.error(error.stack);
-    res.status(500).json({ message: "Failed to edit the goals.", error: error.message });
+    console.error("Edit goal failed:", error);
+    res.status(500).json({ message: "Failed to edit the goal." });
   }
 };
 
 
 const deleteGoal = async (req, res) => {
-  const { id } = req.params;
+  const id = parsePositiveInt(req.params.id);
+  if (!id) return res.status(400).json({ error: "Invalid goal id." });
 
   try {
-    await prisma.goal.delete({
-      where: { id: Number(id) },
-    });
-    res.json({ message: "Expense deleted successfully" });
+    const result = await prisma.goal.deleteMany({ where: { id, userId: req.user.id } });
+    if (!result.count) return res.status(404).json({ error: "Goal not found." });
+    res.json({ message: "Goal deleted successfully." });
   } catch (error) {
-    res.status(500).json({ error: "Could not delete expense" });
+    res.status(500).json({ error: "Could not delete goal." });
   }
 };
 module.exports = {

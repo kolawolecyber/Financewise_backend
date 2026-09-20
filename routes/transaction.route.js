@@ -8,7 +8,7 @@ const {
 const router = express.Router();
 
 router.post("/", verifyToken, createTransaction);
-router.get("/",  verifyToken, getTransactions);
+router.get("/", verifyToken, getTransactions);
 router.delete("/:id", verifyToken, deleteTransaction);
 
 module.exports = router;
