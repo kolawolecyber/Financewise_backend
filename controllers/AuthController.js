@@ -2,6 +2,7 @@ const prisma = require("../config/prisma");
 const JWT_SECRET = process.env.JWT_SECRET;
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { AUTH_COOKIE, getAuthCookieOptions } = require('../config/auth');
 
 const signup = async (req, res) => {
   const { name, email, password } = req.body;
@@ -53,14 +54,21 @@ const login = async (req, res) => {
     // Generate token
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1d' });
 
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+    res.cookie(AUTH_COOKIE, token, getAuthCookieOptions());
+    res.json({ user: { id: user.id, name: user.name, email: user.email } });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 }
 
+const logout = (req, res) => {
+  res.clearCookie(AUTH_COOKIE, getAuthCookieOptions());
+  return res.status(204).send();
+};
+
 module.exports= {
     signup,
-    login
+    login,
+    logout
 }

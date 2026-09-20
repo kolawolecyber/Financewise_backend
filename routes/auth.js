@@ -11,5 +11,6 @@ router.post('/register', authRateLimit, authController.signup);
 
 // LOGIN
 router.post('/login', authRateLimit, authController.login );
+router.post('/logout', authController.logout);
 
 module.exports = router;
