@@ -4,6 +4,7 @@ import request from "supertest";
 
 process.env.JWT_SECRET = "test-secret-for-server-security";
 process.env.FRONTEND_URL = "https://frontend.example";
+process.env.NODE_ENV = "test";
 
 const require = createRequire(import.meta.url);
 const app = require("../server");

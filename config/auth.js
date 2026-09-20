@@ -3,7 +3,8 @@ const AUTH_MAX_AGE = 24 * 60 * 60 * 1000;
 const validSameSiteValues = ["lax", "strict", "none"];
 
 const getAuthCookieOptions = () => {
-  const sameSite = (process.env.AUTH_COOKIE_SAMESITE || "lax").toLowerCase();
+  const defaultSameSite = process.env.NODE_ENV === "production" ? "none" : "lax";
+  const sameSite = (process.env.AUTH_COOKIE_SAMESITE || defaultSameSite).toLowerCase();
   if (!validSameSiteValues.includes(sameSite)) {
     throw new Error("AUTH_COOKIE_SAMESITE must be lax, strict, or none.");
   }

@@ -4,7 +4,8 @@ Financewise webApp backend to track down your expenses and save for the future
 ## Authentication
 
 `POST /api/auth/login` sets the `financewise_token` HTTP-only cookie. The cookie is
-`SameSite=Lax` by default and is marked `Secure` in production. The frontend must
+`SameSite=Lax` by default locally and `SameSite=None; Secure` by default in
+production, which supports a frontend and API hosted on different sites. The frontend must
 send requests with credentials enabled (`credentials: "include"`); it should not
 store an access token in `localStorage`. `POST /api/auth/logout` clears the cookie.
 
